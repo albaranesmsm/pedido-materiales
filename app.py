@@ -4,7 +4,7 @@ import datetime
 import smtplib
 from email.message import EmailMessage
 from openpyxl import Workbook
-from openpyxl.writer.excel import save_virtual_workbook
+from io import BytesIO  # <-- corrección
 # --- DATOS SMTP (Brevo) ---
 SMTP_SERVER = "smtp-relay.brevo.com"
 SMTP_PORT = 587
@@ -79,14 +79,16 @@ if st.button("Generar y enviar pedido"):
        df = pd.DataFrame(pedido)
        df["Comprador"] = COMPRADOR
        df["Fecha"] = fecha
-       # Excel
+       # Excel a memoria (corregido con BytesIO)
        wb = Workbook()
        ws = wb.active
        ws.title = "Pedido"
        ws.append(df.columns.tolist())
        for row in df.itertuples(index=False):
            ws.append(list(row))
-       excel_bytes = save_virtual_workbook(wb)
+       excel_buffer = BytesIO()
+       wb.save(excel_buffer)
+       excel_bytes = excel_buffer.getvalue()
        # Email
        msg = EmailMessage()
        msg["Subject"] = ASUNTO
@@ -94,7 +96,12 @@ if st.button("Generar y enviar pedido"):
        msg["To"] = DESTINATARIO
        msg["Cc"] = COPIA
        msg.set_content(f"Hola,\n\nSe adjunta el pedido generado el {fecha}.\n\nUn saludo.")
-       msg.add_attachment(excel_bytes, maintype="application", subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename="pedido.xlsx")
+       msg.add_attachment(
+           excel_bytes,
+           maintype="application",
+           subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+           filename="pedido.xlsx"
+       )
        try:
            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as smtp:
                smtp.starttls()
