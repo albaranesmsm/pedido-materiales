@@ -5,23 +5,27 @@ import smtplib
 from email.message import EmailMessage
 from io import BytesIO
 from openpyxl import Workbook
-from openpyxl.writer.excel import save_virtual_workbook
 # --- CONFIGURACIÓN SMTP ---
 SMTP_SERVER = "smtp.office365.com"
 SMTP_PORT = 587
 SMTP_USER = "albaranesmsm@outlook.es"
-SMTP_PASSWORD = "JjHRLIE1BD3U2MwC"  # Asegúrate de tener una contraseña de aplicación válida
+SMTP_PASSWORD = "JjHRLIE1BD3U2MwC"
 DESTINATARIO = "davidvictores@hotmail.com"
 COPIA = "dvictoresg@mahou-sanmiguel.com"
 ASUNTO = "TEST ASUNTO"
+# --- FUNCIÓN PARA CREAR EL EXCEL EN MEMORIA ---
 def crear_excel(df):
+   output = BytesIO()
    wb = Workbook()
    ws = wb.active
    ws.title = "Pedido"
    ws.append(df.columns.tolist())
    for row in df.itertuples(index=False):
        ws.append(list(row))
-   return save_virtual_workbook(wb)
+   wb.save(output)
+   output.seek(0)
+   return output.getvalue()
+# --- FUNCIÓN PARA ENVIAR EL CORREO ---
 def enviar_correo(excel_bytes):
    msg = EmailMessage()
    msg["Subject"] = ASUNTO
@@ -41,8 +45,7 @@ def enviar_correo(excel_bytes):
        server.send_message(msg)
 # --- STREAMLIT APP ---
 st.title("Pedido de Materiales")
-# Aquí incluirías tu lógica de artículos, validaciones y recogida de cantidades
-# Simulación de pedido:
+# Simulación de entrada de datos (puedes reemplazar esto con tu lógica real)
 if st.button("Generar Pedido"):
    pedido = [
        {
