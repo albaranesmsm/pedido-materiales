@@ -1,59 +1,38 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import os
+import smtplib
+from email.message import EmailMessage
+from openpyxl import Workbook
+from openpyxl.writer.excel import save_virtual_workbook
+# --- DATOS SMTP (Brevo) ---
+SMTP_SERVER = "smtp-relay.brevo.com"
+SMTP_PORT = 587
+SMTP_USER = "8b6a63001@smtp-brevo.com"
+SMTP_PASSWORD = "JjHRLIE1BD3U2MwC"
 # --- DATOS FIJOS ---
-DIR_ENTREGA_DEFECTO = "8040"
 COMPRADOR = "612539"
+DESTINATARIO = "davidvictores@hotmail.com"
+COPIA = "dvictoresg@mahou-sanmiguel.com"
+ASUNTO = "TEST ASUNTO"
 # --- RELACIÓN ARTÍCULOS Y PROVEEDORES ---
 proveedores = {
-   "1600043": "13161",
-   "1600050": "13161",
-   "1600051": "13161",
-   "1600052": "13161",
-   "1600053": "13161",
-   "1600054": "13161",
-   "1600055": "13161",
-   "1600911": "13161",
-   "1600921": "13161",
-   "1601104": "13161",
-   "1601161": "13161",
-   "1601271": "13161",
-   "1601306": "13161",
-   "0400153": "10381",
-   "0400176": "10381",
-   "0400177": "10381",
-   "0400232": "10381",
-   "0400543": "10381",
-   "0400548": "10381",
-   "0400699": "10381",
+   "1600043": "13161", "1600050": "13161", "1600051": "13161", "1600052": "13161", "1600053": "13161",
+   "1600054": "13161", "1600055": "13161", "1600911": "13161", "1600921": "13161", "1601104": "13161",
+   "1601161": "13161", "1601271": "13161", "1601306": "13161", "0400153": "10381", "0400176": "10381",
+   "0400177": "10381", "0400232": "10381", "0400543": "10381", "0400548": "10381", "0400699": "10381",
    "1601001": "10381"
 }
 # --- RELACIÓN ARTÍCULOS Y OB ---
 ob_values = {
-   "1600043": "14001536",
-   "1600050": "14001536",
-   "1600051": "14001536",
-   "1600052": "14001536",
-   "1600053": "14001536",
-   "1600054": "14001536",
-   "1600055": "14001536",
-   "1600911": "14001536",
-   "1600921": "14001536",
-   "1601104": "14001536",
-   "1601161": "14001536",
-   "1601271": "14001536",
-   "1601306": "14001536",
-   "0400153": "31005151",
-   "0400176": "31005151",
-   "0400177": "31005151",
-   "0400232": "31005151",
-   "0400543": "31005151",
-   "0400548": "31005151",
-   "0400699": "31005151",
+   "1600043": "14001536", "1600050": "14001536", "1600051": "14001536", "1600052": "14001536",
+   "1600053": "14001536", "1600054": "14001536", "1600055": "14001536", "1600911": "14001536",
+   "1600921": "14001536", "1601104": "14001536", "1601161": "14001536", "1601271": "14001536",
+   "1601306": "14001536", "0400153": "31005151", "0400176": "31005151", "0400177": "31005151",
+   "0400232": "31005151", "0400543": "31005151", "0400548": "31005151", "0400699": "31005151",
    "1601001": "31005151"
 }
-# --- LISTADO DE ARTÍCULOS ---
+# --- LISTA DE ARTÍCULOS ---
 articulos = [
    {"Nº artículo": "1600043", "Descripción": "TUB DESAG PVC//PVC"},
    {"Nº artículo": "1600050", "Descripción": "PYTHON A Inund 1 P"},
@@ -73,88 +52,54 @@ articulos = [
    {"Nº artículo": "0400177", "Descripción": "TOPFOAM Limp máq"},
    {"Nº artículo": "0400232", "Descripción": "PLUS ESPEC Limp inst."},
    {"Nº artículo": "0400543", "Descripción": "ALUTRAT Limp inst."},
-   {"Nº artículo": "0400548", "Descripción": "ULTRASON Liquido"},
-   {"Nº artículo": "0400699", "Descripción": "DIVOSAN TC86 SDC"},
-   {"Nº artículo": "1601001", "Descripción": "GLICOL Anticong"}
+   {"Nº artículo": "0400548", "Descripción": "ULTR"},
+   {"Nº artículo": "0400699", "Descripción": "MULTIUSOS Higiene"},
+   {"Nº artículo": "1601001", "Descripción": "PROTECTOR CO2"}
 ]
-# --- RESTRICCIONES POR ARTÍCULO ---
-restricciones = {
-   "1600043": {"multiplo": 25, "max": 1500},
-   "1600050": {"multiplo": 25, "max": 2000},
-   "1600051": {"multiplo": 25, "max": 500},
-   "1600052": {"multiplo": 25, "max": 500},
-   "1600053": {"multiplo": 25, "max": 500},
-   "1600054": {"multiplo": 25, "max": 500},
-   "1600055": {"multiplo": 25, "max": 1500},
-   "1600911": {"multiplo": 25, "max": 1000},
-   "1600921": {"multiplo": 25, "max": 6000},
-   "1601104": {"multiplo": 25, "max": 50},
-   "1601161": {"multiplo": 25, "max": 5000},
-   "1601271": {"multiplo": 25, "max": 300},
-   "1601306": {"multiplo": 25, "max": 300},
-   "0400153": {"multiplo": 10, "max": 300},
-   "0400176": {"multiplo": 10, "max": 80},
-   "0400177": {"multiplo": 20, "max": 80},
-   "0400232": {"multiplo": 600, "max": 1800},
-   "0400543": {"multiplo": 20, "max": 300},
-   "0400548": {"multiplo": 20, "max": 50},
-   "0400699": {"multiplo": 24, "max": 240},
-   "1601001": {"multiplo": 25, "max": 600}
-}
 # --- INTERFAZ ---
-st.title("Pedido de Materiales")
-dir_entrega = st.text_input("Código de Dirección de Entrega", value=DIR_ENTREGA_DEFECTO)
-st.subheader("Selecciona las cantidades:")
+st.title("Generador de pedidos")
+st.markdown("Selecciona los artículos y cantidades para generar el pedido.")
 pedido = []
-errores = []
 for articulo in articulos:
-   codigo = str(articulo["Nº artículo"])  # Convertimos a cadena para evitar errores de tipo
-   descripcion = articulo["Descripción"]
-   # Obtener los valores de proveedor y OB según el código
-   proveedor = proveedores.get(codigo)
-   ob = ob_values.get(codigo)
-   # Si el artículo no tiene proveedor o OB, se agrega a errores
-   if not proveedor or not ob:
-       errores.append(f"Artículo {codigo} no tiene proveedor o OB definido.")
-       continue
-   maximo = restricciones.get(codigo, {}).get("max", 1000)
-   multiplo = restricciones.get(codigo, {}).get("multiplo", 1)
-   cantidad = st.number_input(
-       f"{descripcion} (Múltiplo: {multiplo}, Máx: {maximo})",
-       min_value=0,
-       max_value=maximo,
-       step=multiplo,
-       value=0,
-   )
+   cantidad = st.number_input(f"{articulo['Descripción']} ({articulo['Nº artículo']})", min_value=0, step=1)
    if cantidad > 0:
-       pedido.append(
-           {
-               "Fecha solicitud": datetime.date.today(),
-               "OB": ob,
-               "Comprador": COMPRADOR,
-               "LM aux": "00004014",
-               "Cód Prov": proveedor,
-               "Proveedor": "",
-               "Suc/planta": 8040,
-               "Dir entr": dir_entrega,
-               "Nº artículo": codigo,
-               "Descripción": descripcion,
-               "Autorizar cant": cantidad,
-           }
-       )
-# --- GENERAR ARCHIVO EXCEL ---
-if st.button("Generar Pedido"):
-   if pedido:
-       df = pd.DataFrame(pedido)
-       file_path = "pedido_materiales.xlsx"
-       df.to_excel(file_path, index=False)
-       st.success("Pedido generado correctamente.")
-       st.download_button("Descargar Pedido", data=open(file_path, "rb"), file_name=file_path)
-       # --- GENERAR ENLACE PARA EMAIL ---
-       email = "robot1@mahou-sanmiguel.com"
-       asunto = "OAs pedidos materiales operaciones de venta"
-       cuerpo = "Adjunto encontrarás el archivo con los pedidos de materiales."
-       mailto_link = f'mailto:{email}?subject={asunto}&body={cuerpo}'
-       st.markdown(f"[Preparar correo](mailto:{email}?subject={asunto}&body={cuerpo})", unsafe_allow_html=True)
+       pedido.append({
+           "Nº artículo": articulo["Nº artículo"],
+           "Descripción": articulo["Descripción"],
+           "Cantidad": cantidad,
+           "Proveedor": proveedores.get(articulo["Nº artículo"], ""),
+           "OB": ob_values.get(articulo["Nº artículo"], "")
+       })
+email_origen = st.text_input("Tu nombre o correo (solo se mostrará como remitente)")
+if st.button("Generar y enviar pedido"):
+   if not email_origen:
+       st.warning("Por favor, introduce tu nombre o email.")
    else:
-       st.warning("No se ha seleccionado ningún artículo.")
+       fecha = datetime.datetime.now().strftime("%Y-%m-%d")
+       df = pd.DataFrame(pedido)
+       df["Comprador"] = COMPRADOR
+       df["Fecha"] = fecha
+       # Excel
+       wb = Workbook()
+       ws = wb.active
+       ws.title = "Pedido"
+       ws.append(df.columns.tolist())
+       for row in df.itertuples(index=False):
+           ws.append(list(row))
+       excel_bytes = save_virtual_workbook(wb)
+       # Email
+       msg = EmailMessage()
+       msg["Subject"] = ASUNTO
+       msg["From"] = email_origen
+       msg["To"] = DESTINATARIO
+       msg["Cc"] = COPIA
+       msg.set_content(f"Hola,\n\nSe adjunta el pedido generado el {fecha}.\n\nUn saludo.")
+       msg.add_attachment(excel_bytes, maintype="application", subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename="pedido.xlsx")
+       try:
+           with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as smtp:
+               smtp.starttls()
+               smtp.login(SMTP_USER, SMTP_PASSWORD)
+               smtp.send_message(msg)
+           st.success("Pedido enviado con éxito.")
+       except Exception as e:
+           st.error(f"Error al enviar el correo: {e}")
